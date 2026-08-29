@@ -7,9 +7,9 @@ import PublicarPage from './features/publicar/PublicarPage'
 
 // Componente para proteger rutas
 function ProtectedRoute({ element, requireAuth = true, requireAdmin = false, requireRole = null }) {
-  const { isAuthenticated, isAdmin, usuarioData, loading } = useAuth()
+  const { isAuthenticated, isAdmin, usuarioData, loading, profileLoading } = useAuth()
 
-  if (loading) {
+  if (loading || profileLoading) {
     return <div style={{ textAlign: 'center', padding: '2rem' }}>Cargando...</div>
   }
 

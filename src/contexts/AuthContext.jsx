@@ -7,10 +7,13 @@ export function AuthProvider({ children }) {
     const [user, setUser] = useState(null)
     const [usuarioData, setUsuarioData] = useState(null)
     const [loading, setLoading] = useState(true)
+    const [profileLoading, setProfileLoading] = useState(true)
     const [error, setError] = useState(null)
 
     // Función para cargar datos del usuario (memoizada)
     const loadUsuarioData = useCallback(async (authId) => {
+        setProfileLoading(true)
+
         try {
             const { data, error: err } = await supabase
                 .from('usuarios')
@@ -29,6 +32,8 @@ export function AuthProvider({ children }) {
         } catch (err) {
             console.error('Error inesperado:', err)
             setError('Error al cargar datos')
+        } finally {
+            setProfileLoading(false)
         }
     }, [])
 
@@ -39,9 +44,16 @@ export function AuthProvider({ children }) {
                 const { data: { session } } = await supabase.auth.getSession()
                 if (session?.user) {
                     setUser(session.user)
+                } else {
+                    setUser(null)
+                    setUsuarioData(null)
+                    setProfileLoading(false)
                 }
             } catch (err) {
                 console.error('Error al verificar sesión:', err)
+                setUser(null)
+                setUsuarioData(null)
+                setProfileLoading(false)
             } finally {
                 setLoading(false)
             }
@@ -57,6 +69,7 @@ export function AuthProvider({ children }) {
                 } else {
                     setUser(null)
                     setUsuarioData(null)
+                    setProfileLoading(false)
                 }
             }
         )
@@ -70,6 +83,7 @@ export function AuthProvider({ children }) {
             loadUsuarioData(user.id)
         } else {
             setUsuarioData(null)
+            setProfileLoading(false)
         }
     }, [user, loadUsuarioData])
 
@@ -161,6 +175,7 @@ export function AuthProvider({ children }) {
                 user,
                 usuarioData,
                 loading,
+                profileLoading,
                 error,
                 setError,
                 registro,
