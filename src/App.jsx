@@ -6,8 +6,8 @@ import ExplorarPage from './features/explorar/ExplorarPage'
 import PublicarPage from './features/publicar/PublicarPage'
 
 // Componente para proteger rutas
-function ProtectedRoute({ element, requireAuth = true, requireAdmin = false }) {
-  const { isAuthenticated, isAdmin, loading } = useAuth()
+function ProtectedRoute({ element, requireAuth = true, requireAdmin = false, requireRole = null }) {
+  const { isAuthenticated, isAdmin, usuarioData, loading } = useAuth()
 
   if (loading) {
     return <div style={{ textAlign: 'center', padding: '2rem' }}>Cargando...</div>
@@ -21,6 +21,10 @@ function ProtectedRoute({ element, requireAuth = true, requireAdmin = false }) {
     return <Navigate to="/" replace />
   }
 
+  if (requireRole && usuarioData?.rol !== requireRole) {
+    return <Navigate to="/" replace />
+  }
+
   return element
 }
 
@@ -28,9 +32,11 @@ function App() {
   const { isAuthenticated, usuarioData, logout } = useAuth()
   const navigate = useNavigate()
 
-  const handleLogout = () => {
-    logout()
-    navigate('/')
+  const handleLogout = async () => {
+    const result = await logout()
+    if (result.success) {
+      navigate('/')
+    }
   }
 
   return (
@@ -67,7 +73,7 @@ function App() {
           <Route path="/" element={<ExplorarPage />} />
           <Route
             path="/publicar"
-            element={<ProtectedRoute element={<PublicarPage />} requireAuth />}
+            element={<ProtectedRoute element={<PublicarPage />} requireAuth requireRole="vendedor" />}
           />
           <Route path="/ingresar" element={<AuthPage />} />
           <Route

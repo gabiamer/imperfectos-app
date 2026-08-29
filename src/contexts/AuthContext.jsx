@@ -39,8 +39,6 @@ export function AuthProvider({ children }) {
                 const { data: { session } } = await supabase.auth.getSession()
                 if (session?.user) {
                     setUser(session.user)
-                    // Cargar datos de la tabla usuarios
-                    await loadUsuarioData(session.user.id)
                 }
             } catch (err) {
                 console.error('Error al verificar sesión:', err)
@@ -51,12 +49,11 @@ export function AuthProvider({ children }) {
 
         checkSession()
 
-        // Escuchar cambios de autenticación
+        // Escuchar cambios de autenticación (callback síncrono para evitar deadlock)
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
-            async (event, session) => {
+            (event, session) => {
                 if (session?.user) {
                     setUser(session.user)
-                    await loadUsuarioData(session.user.id)
                 } else {
                     setUser(null)
                     setUsuarioData(null)
@@ -65,14 +62,32 @@ export function AuthProvider({ children }) {
         )
 
         return () => subscription?.unsubscribe()
-    }, [loadUsuarioData])
+    }, [])
+
+    // Cargar datos del usuario cuando `user` cambia (useEffect separado)
+    useEffect(() => {
+        if (user?.id) {
+            loadUsuarioData(user.id)
+        } else {
+            setUsuarioData(null)
+        }
+    }, [user, loadUsuarioData])
 
     const registro = async (nombre, telefono, rol, zona, pin) => {
         setError(null)
         try {
-            const { data: authData, error: authError } = await supabase.auth.signUp({
+            // El trigger en la BD crea el perfil usuario automáticamente desde raw_user_meta_data
+            const { error: authError } = await supabase.auth.signUp({
                 email: `${telefono}@imperfectos-app.com`,
-                password: `${telefono}:${pin}`, // ← usa el PIN real, no el literal "PIN"
+                password: `${telefono}:${pin}`,
+                options: {
+                    data: {
+                        nombre,
+                        telefono,
+                        rol,
+                        zona,
+                    },
+                },
             })
 
             if (authError) {
@@ -81,17 +96,6 @@ export function AuthProvider({ children }) {
                         ? 'Este teléfono ya está registrado'
                         : 'Error al registrar: ' + authError.message
                 )
-                return { success: false }
-            }
-
-            const authId = authData.user?.id
-
-            const { error: dbError } = await supabase
-                .from('usuarios')
-                .insert({ auth_id: authId, nombre, telefono, rol, zona })
-
-            if (dbError) {
-                setError('Error al crear registro: ' + dbError.message)
                 return { success: false }
             }
 
@@ -144,8 +148,10 @@ export function AuthProvider({ children }) {
             setUser(null)
             setUsuarioData(null)
             setError(null)
+            return { success: true }
         } catch (err) {
             setError('Error al cerrar sesión: ' + err.message)
+            return { success: false }
         }
     }
 
