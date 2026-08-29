@@ -1,10 +1,44 @@
-import { NavLink, Route, Routes } from 'react-router-dom'
+import { Navigate, NavLink, Route, Routes, useNavigate } from 'react-router-dom'
+import { useAuth } from './contexts/AuthContext'
 import AdminPage from './features/admin/AdminPage'
 import AuthPage from './features/auth/AuthPage'
 import ExplorarPage from './features/explorar/ExplorarPage'
 import PublicarPage from './features/publicar/PublicarPage'
 
+// Componente para proteger rutas
+function ProtectedRoute({ element, requireAuth = true, requireAdmin = false, requireRole = null }) {
+  const { isAuthenticated, isAdmin, usuarioData, loading, profileLoading } = useAuth()
+
+  if (loading || profileLoading) {
+    return <div style={{ textAlign: 'center', padding: '2rem' }}>Cargando...</div>
+  }
+
+  if (requireAuth && !isAuthenticated) {
+    return <Navigate to="/ingresar" replace />
+  }
+
+  if (requireAdmin && !isAdmin) {
+    return <Navigate to="/" replace />
+  }
+
+  if (requireRole && usuarioData?.rol !== requireRole) {
+    return <Navigate to="/" replace />
+  }
+
+  return element
+}
+
 function App() {
+  const { isAuthenticated, usuarioData, logout } = useAuth()
+  const navigate = useNavigate()
+
+  const handleLogout = async () => {
+    const result = await logout()
+    if (result.success) {
+      navigate('/')
+    }
+  }
+
   return (
     <div className="app-shell">
       <header className="top-nav">
@@ -13,18 +47,45 @@ function App() {
           <NavLink to="/" end>
             Explorar
           </NavLink>
-          <NavLink to="/publicar">Publicar</NavLink>
-          <NavLink to="/ingresar">Ingresar</NavLink>
-          <NavLink to="/admin">Admin</NavLink>
+          {isAuthenticated && usuarioData?.rol === 'vendedor' && (
+            <NavLink to="/publicar">Publicar</NavLink>
+          )}
+          {isAuthenticated && usuarioData?.rol === 'admin' && (
+            <NavLink to="/admin">Admin</NavLink>
+          )}
+          {!isAuthenticated ? (
+            <NavLink to="/ingresar">Ingresar</NavLink>
+          ) : (
+            <div className="nav-user">
+              <span className="user-info">
+                {usuarioData?.nombre} ({usuarioData?.rol})
+              </span>
+              <button onClick={handleLogout} className="btn-logout">
+                Salir
+              </button>
+            </div>
+          )}
         </nav>
       </header>
 
       <main>
         <Routes>
           <Route path="/" element={<ExplorarPage />} />
-          <Route path="/publicar" element={<PublicarPage />} />
+          <Route
+            path="/publicar"
+            element={<ProtectedRoute element={<PublicarPage />} requireAuth requireRole="vendedor" />}
+          />
           <Route path="/ingresar" element={<AuthPage />} />
-          <Route path="/admin" element={<AdminPage />} />
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute
+                element={<AdminPage />}
+                requireAuth
+                requireAdmin
+              />
+            }
+          />
         </Routes>
       </main>
     </div>
